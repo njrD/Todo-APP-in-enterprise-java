@@ -56,13 +56,13 @@ jobs:
             Run `gh pr diff ${{ env.PR_NUMBER }}` to get the diff, then review ONLY the changes introduced by this PR — do not review pre-existing code that was not modified.
 
             For every file/line reference, link into the PR changes view using this URL format:
-            https://github.com/${{ github.repository }}/pull/${{ env.PR_NUMBER }}/files#diff-{SHA256_OF_FILE_PATH}R{LINE}
+            https://github.com/${{ github.repository }}/pull/${{ env.PR_NUMBER }}/changes#diff-{SHA256_OF_FILE_PATH}R{LINE}
 
             Compute the SHA256 of each file path (not the file content) using:
               printf '%s' 'path/to/File.java' | sha256sum | cut -d' ' -f1
 
             Example: for `src/LoginServlet.java` at line 84, compute the hash and construct:
-            https://github.com/${{ github.repository }}/pull/${{ env.PR_NUMBER }}/files#diff-{hash}R84
+            https://github.com/${{ github.repository }}/pull/${{ env.PR_NUMBER }}/changes#diff-{hash}R84
 
             Post a single comment using:
             gh pr comment ${{ env.PR_NUMBER }} --body "..."
@@ -75,11 +75,11 @@ jobs:
             Group the top 3-5 findings by severity:
 
             **🔴 Important**
-            1. **Issue title** ([`File.java:42`](https://github.com/${{ github.repository }}/pull/${{ env.PR_NUMBER }}/files#diff-{hash}R42))
+            1. **Issue title** ([`File.java:42`](https://github.com/${{ github.repository }}/pull/${{ env.PR_NUMBER }}/changes#diff-{hash}R42))
                - One-line explanation.
 
             **🟡 Nit**
-            1. **Issue title** ([`File.java:10`](https://github.com/${{ github.repository }}/pull/${{ env.PR_NUMBER }}/files#diff-{hash}R10))
+            1. **Issue title** ([`File.java:10`](https://github.com/${{ github.repository }}/pull/${{ env.PR_NUMBER }}/changes#diff-{hash}R10))
                - One-line explanation.
 
             Omit severity sections with no findings.
