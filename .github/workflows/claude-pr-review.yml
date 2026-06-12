@@ -157,6 +157,18 @@ jobs:
           path: review-summary.md
           if-no-files-found: error
 
+      - name: Remove artifact placeholder on upload failure
+        if: github.event_name == 'pull_request' && env.COMMENT_ID != '' && failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api repos/$GITHUB_REPOSITORY/issues/comments/${{ env.COMMENT_ID }} \
+            --jq '.body' \
+            | jq -Rs 'gsub("📄 \\[Download full review\\]\\(ARTIFACT_URL_PLACEHOLDER\\)\\n?"; "")' \
+            | jq -r '.' > updated_body.md
+          gh api repos/$GITHUB_REPOSITORY/issues/comments/${{ env.COMMENT_ID }} \
+            -X PATCH --input - < <(jq -Rs '{"body":.}' updated_body.md) || true
+
       - name: Update comment with artifact link
         if: github.event_name == 'pull_request' && env.COMMENT_ID != '' && steps.upload.outputs.artifact-url != ''
         env:
@@ -186,7 +198,8 @@ jobs:
             --body "<!-- claude-review-${{ github.run_id }} -->⏳ Claude is thinking..." || true
           ACK_ID=$(gh api repos/$GITHUB_REPOSITORY/issues/${{ env.PR_NUMBER }}/comments \
             --paginate | jq -s --arg m "claude-review-${{ github.run_id }}" \
-            '(add // []) | map(select(.body | contains($m))) | last | .id' 2>/dev/null || true)
+            '(add // []) | map(select(.body | contains($m))) | last | .id') \
+            || echo "::warning::Could not retrieve ack comment ID; stub may persist"
           echo "ACK_COMMENT_ID=${ACK_ID:-}" >> $GITHUB_ENV
 
       - uses: anthropics/claude-code-action@2c39411c224657eb2c2b9a146083fd021d72e970 # v1
@@ -225,6 +238,7 @@ jobs:
 
       - name: Delete acknowledgement stub
         if: >
+          (success() || failure()) &&
           github.event_name == 'issue_comment' &&
           github.event.issue.pull_request != null &&
           contains(github.event.comment.body, '@claude') &&
