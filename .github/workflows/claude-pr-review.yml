@@ -83,7 +83,7 @@ jobs:
         run: |
           MARKER="claude-review-${{ github.run_id }}"
           COMMENT_ID=$(gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
-            --jq --arg marker "$MARKER" '[.[] | select(.body | contains($marker))] | last | .id')
+            | jq --arg marker "$MARKER" '[.[] | select(.body | contains($marker))] | last | .id')
 
           if [ -z "$COMMENT_ID" ] || [ "$COMMENT_ID" = "null" ]; then
             echo "No review comment found, skipping artifact steps."
