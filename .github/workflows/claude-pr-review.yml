@@ -24,11 +24,11 @@ jobs:
       issues: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 2
 
-      - uses: anthropics/claude-code-action@v1
+      - uses: anthropics/claude-code-action@2c39411c224657eb2c2b9a146083fd021d72e970 # v1
         if: github.event_name == 'pull_request'
         id: claude
         with:
@@ -84,22 +84,27 @@ jobs:
           MARKER="claude-review-${{ github.run_id }}"
           COMMENT_ID=$(gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
             --jq --arg marker "$MARKER" '[.[] | select(.body | contains($marker))] | last | .id')
-          echo "COMMENT_ID=$COMMENT_ID" >> $GITHUB_ENV
 
+          if [ -z "$COMMENT_ID" ] || [ "$COMMENT_ID" = "null" ]; then
+            echo "No review comment found, skipping artifact steps."
+            exit 0
+          fi
+
+          echo "COMMENT_ID=$COMMENT_ID" >> $GITHUB_ENV
           gh api repos/${{ github.repository }}/issues/comments/$COMMENT_ID \
             --jq '.body' > review-summary.md
 
       - name: Upload review summary
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && env.COMMENT_ID != ''
         id: upload
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: claude-review-summary
           path: review-summary.md
           if-no-files-found: warn
 
       - name: Update comment with artifact link
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && env.COMMENT_ID != '' && steps.upload.outputs.artifact-url != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
@@ -116,7 +121,7 @@ jobs:
           gh api repos/${{ github.repository }}/issues/comments/${{ env.COMMENT_ID }} \
             -X PATCH --field body=@updated_body.md
 
-      - uses: anthropics/claude-code-action@v1
+      - uses: anthropics/claude-code-action@2c39411c224657eb2c2b9a146083fd021d72e970 # v1
         if: >
           github.event_name == 'issue_comment' &&
           github.event.issue.pull_request != null &&
@@ -127,3 +132,11 @@ jobs:
           claude_args: >-
             --model claude-sonnet-4-6
             --allowedTools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh issue comment:*)"
+          prompt: |
+            A user commented "@claude" on PR #${{ github.event.issue.number }} in ${{ github.repository }}.
+
+            Their comment: ${{ github.event.comment.body }}
+
+            Respond helpfully in the context of this pull request. Use:
+            gh pr comment ${{ github.event.issue.number }} --body "..."
+            to post your reply. Only post via gh — do not output as a message.
