@@ -13,14 +13,13 @@ jobs:
       contents: read
       pull-requests: write
       issues: write
-      id-token: write
 
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 2
 
-      - uses: anthropics/claude-code-action@beta
+      - uses: anthropics/claude-code-action@v1
         if: github.event_name == 'pull_request'
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -34,7 +33,7 @@ jobs:
             - Suggestions for improvement
             Post your review as a PR comment.
 
-      - uses: anthropics/claude-code-action@beta
+      - uses: anthropics/claude-code-action@v1
         if: github.event_name == 'issue_comment'
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
