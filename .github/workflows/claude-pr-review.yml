@@ -17,7 +17,7 @@ jobs:
       (github.event_name == 'issue_comment' && github.event.issue.pull_request != null) ||
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     env:
       CLAUDE_MODEL: ${{ vars.CLAUDE_REVIEW_MODEL || 'claude-sonnet-4-6' }}
       CLAUDE_MAX_TURNS: ${{ vars.CLAUDE_REVIEW_MAX_TURNS || 5 }}
@@ -32,18 +32,6 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 1
-
-      - name: Delete previous review comment
-        if: github.event_name == 'pull_request'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -eo pipefail
-          PREV_IDS=$(gh api repos/$GITHUB_REPOSITORY/issues/${{ env.PR_NUMBER }}/comments \
-            --paginate | jq -s '[(add // [])[] | select(.body | test("<!-- claude-review-[0-9]+ -->")) | .id]')
-          while IFS= read -r ID; do
-            gh api repos/$GITHUB_REPOSITORY/issues/comments/$ID -X DELETE
-          done < <(echo "$PREV_IDS" | jq -r '.[]')
 
       - uses: anthropics/claude-code-action@2c39411c224657eb2c2b9a146083fd021d72e970 # v1
         if: github.event_name == 'pull_request'
@@ -147,6 +135,14 @@ jobs:
           echo "COMMENT_ID=$COMMENT_ID" >> $GITHUB_ENV
           gh api repos/$GITHUB_REPOSITORY/issues/comments/$COMMENT_ID \
             --jq '.body' > review-summary.md
+
+          # Delete prior review comments now that the new one is confirmed posted
+          PREV_IDS=$(gh api repos/$GITHUB_REPOSITORY/issues/${{ env.PR_NUMBER }}/comments \
+            --paginate | jq -s --arg new "$COMMENT_ID" \
+            '[(add // [])[] | select(.body | test("<!-- claude-review-[0-9]+ -->")) | select(.id | tostring != $new) | .id]')
+          while IFS= read -r ID; do
+            gh api repos/$GITHUB_REPOSITORY/issues/comments/$ID -X DELETE || true
+          done < <(echo "$PREV_IDS" | jq -r '.[]')
 
       - name: Upload review summary
         if: github.event_name == 'pull_request' && env.COMMENT_ID != ''
@@ -262,7 +258,7 @@ jobs:
           if [ -n "$COMMENT_ID" ] && [ "$COMMENT_ID" != "null" ]; then
             gh api repos/$GITHUB_REPOSITORY/issues/comments/$COMMENT_ID --jq '.body' \
               | sed "s|ARTIFACT_URL_PLACEHOLDER|_(upload cancelled)_|g" \
-              | cat - <(printf '\n\n---\n⏱️ **Review timed out** after 10 minutes and was cancelled. The review above may be incomplete.') \
+              | cat - <(printf '\n\n---\n⏱️ **Review timed out** after 15 minutes and was cancelled. The review above may be incomplete.') \
               > updated_body.md
             gh api repos/$GITHUB_REPOSITORY/issues/comments/$COMMENT_ID \
               -X PATCH --input - < <(jq -Rs '{"body":.}' updated_body.md)
