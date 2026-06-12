@@ -24,7 +24,7 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          show_full_output: true
+          claude_args: --model claude-sonnet-4-5 --dangerously-skip-permissions
           prompt: |
             Please review this pull request. Cover:
             - What the PR does (brief summary)
@@ -33,10 +33,7 @@ jobs:
             - Security concerns
             - Suggestions for improvement
 
-            After writing the PR comment, also write a file called `review-summary.md` using the Bash tool with a command like: `cat > $GITHUB_WORKSPACE/review-summary.md << 'EOF' ... EOF`. The file must be written to $GITHUB_WORKSPACE. Structure it as:
-
-            ```
-            # PR Review Summary
+            Structure your PR comment in this exact LLM-friendly format:
 
             ## Context
             <repo, PR number, title, author, date>
@@ -56,21 +53,35 @@ jobs:
             <one line: Approve / Request Changes / Needs Discussion>
 
             ## Full Review
-            <the complete review text>
-            ```
+            <complete narrative review>
 
-            Mention in the PR comment that a downloadable LLM-friendly summary is attached as a workflow artifact named `claude-review-summary`.
+            ---
+            *A downloadable copy of this review is attached as a workflow artifact named `claude-review-summary`.*
+
+      - name: Save review as artifact
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
+            --jq '[.[] | select(.user.login == "github-actions[bot]")] | last | .body' \
+            > review-summary.md
+          echo "" >> review-summary.md
+          echo "---" >> review-summary.md
+          echo "PR: ${{ github.event.pull_request.html_url }}" >> review-summary.md
+          echo "Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> review-summary.md
 
       - name: Upload review summary
         if: github.event_name == 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: claude-review-summary
-          path: ${{ github.workspace }}/review-summary.md
-          if-no-files-found: ignore
+          path: review-summary.md
+          if-no-files-found: warn
 
       - uses: anthropics/claude-code-action@v1
         if: github.event_name == 'issue_comment'
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          claude_args: --model claude-sonnet-4-5 --dangerously-skip-permissions
