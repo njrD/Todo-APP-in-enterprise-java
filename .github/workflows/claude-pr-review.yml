@@ -46,8 +46,7 @@ jobs:
                 "deny": []
               }
             }
-          max_turns: ${{ env.CLAUDE_MAX_TURNS }}
-          claude_args: --model ${{ env.CLAUDE_MODEL }}
+          claude_args: --model ${{ env.CLAUDE_MODEL }} --max-turns ${{ env.CLAUDE_MAX_TURNS }}
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ env.PR_NUMBER }}
@@ -177,8 +176,7 @@ jobs:
                 "deny": []
               }
             }
-          max_turns: ${{ env.CLAUDE_MAX_TURNS }}
-          claude_args: --model ${{ env.CLAUDE_MODEL }}
+          claude_args: --model ${{ env.CLAUDE_MODEL }} --max-turns ${{ env.CLAUDE_MAX_TURNS }}
           prompt: |
             A trusted collaborator asked a question about PR #${{ env.PR_NUMBER }} in ${{ github.repository }}.
 
