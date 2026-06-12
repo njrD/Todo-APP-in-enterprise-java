@@ -122,7 +122,7 @@ jobs:
         run: |
           MARKER="claude-review-${{ github.run_id }}"
           COMMENT_ID=$(gh api repos/${{ github.repository }}/issues/${{ env.PR_NUMBER }}/comments \
-            --paginate | jq --arg marker "$MARKER" '[.[] | select(.body | contains($marker))] | last | .id')
+            --paginate | jq -s --arg marker "$MARKER" '[.[].[] | select(.body | contains($marker))] | last | .id')
 
           if [ -z "$COMMENT_ID" ] || [ "$COMMENT_ID" = "null" ]; then
             gh pr comment ${{ env.PR_NUMBER }} \
@@ -150,7 +150,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
         run: |
-          SAFE_URL=$(printf '%s' "$ARTIFACT_URL" | sed 's/[&\\\/|]/\\&/g')
+          SAFE_URL=$(printf '%s' "$ARTIFACT_URL" | sed 's/[&|]/\\&/g')
           gh api repos/${{ github.repository }}/issues/comments/${{ env.COMMENT_ID }} \
             --jq '.body' \
             | sed "s|ARTIFACT_URL_PLACEHOLDER|${SAFE_URL}|g" > updated_body.md
@@ -164,6 +164,8 @@ jobs:
           github.event.issue.pull_request != null &&
           contains(github.event.comment.body, '@claude') &&
           contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
+        # Accepted risk: trusted collaborators (OWNER/MEMBER/COLLABORATOR) could craft
+        # adversarial comment bodies. Blast radius is bounded by the narrow allow-list below.
         env:
           USER_COMMENT: ${{ github.event.comment.body }}
         with:
@@ -196,7 +198,7 @@ jobs:
         run: |
           MARKER="claude-review-${{ github.run_id }}"
           COMMENT_ID=$(gh api repos/${{ github.repository }}/issues/${{ env.PR_NUMBER }}/comments \
-            --paginate | jq --arg marker "$MARKER" '[.[] | select(.body | contains($marker))] | last | .id')
+            --paginate | jq -s --arg marker "$MARKER" '[.[].[] | select(.body | contains($marker))] | last | .id')
 
           if [ -n "$COMMENT_ID" ] && [ "$COMMENT_ID" != "null" ]; then
             gh api repos/${{ github.repository }}/issues/comments/$COMMENT_ID --jq '.body' \
