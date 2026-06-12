@@ -85,8 +85,8 @@ jobs:
             | jq --arg marker "$MARKER" '[.[] | select(.body | contains($marker))] | last | .id')
 
           if [ -z "$COMMENT_ID" ] || [ "$COMMENT_ID" = "null" ]; then
-            echo "No review comment found, skipping artifact steps."
-            exit 0
+            echo "::error::Claude did not post a review comment. Check API credits or action logs."
+            exit 1
           fi
 
           echo "COMMENT_ID=$COMMENT_ID" >> $GITHUB_ENV
