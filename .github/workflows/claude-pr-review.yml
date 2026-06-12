@@ -34,19 +34,27 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          show_full_output: true
+          settings: |
+            {
+              "permissions": {
+                "allow": ["Bash(gh pr comment:*)", "Bash(gh pr diff:*)", "Bash(gh pr view:*)"],
+                "deny": []
+              }
+            }
           claude_args: --model claude-sonnet-4-6
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
 
-            Review this pull request and post a single comment using:
+            Run `gh pr diff ${{ github.event.pull_request.number }}` to get the diff, then review ONLY the changes introduced by this PR — do not review pre-existing code that was not modified.
+
+            Post a single comment using:
             gh pr comment ${{ github.event.pull_request.number }} --body "..."
 
             The comment must follow this exact structure:
 
             <!-- claude-review-${{ github.run_id }} -->
-            <short summary of 3-5 bullet points covering the most important findings>
+            <short summary of 3-5 bullet points covering the most important findings in the diff>
 
             📄 [Download full review](ARTIFACT_URL_PLACEHOLDER)
 
@@ -54,7 +62,7 @@ jobs:
             <summary>Full review</summary>
 
             ## What Changed
-            <concise description of the diff>
+            <concise description of what the diff introduces>
 
             ## Findings
             ### Critical
@@ -68,12 +76,12 @@ jobs:
             <one line: Approve / Request Changes / Needs Discussion>
 
             ## Full Review
-            <complete narrative review>
+            <complete narrative review scoped to the diff>
 
             </details>
 
-            Use the literal text ARTIFACT_URL_PLACEHOLDER for the link — it will be replaced with the real download URL after upload.
-            Only post the comment via gh — do not output the review as a message.
+            Use the literal text ARTIFACT_URL_PLACEHOLDER for the download link.
+            Only post via gh — do not output the review as a message.
 
       - name: Save review as artifact
         if: github.event_name == 'pull_request'
@@ -130,6 +138,13 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          settings: |
+            {
+              "permissions": {
+                "allow": ["Bash(gh pr comment:*)", "Bash(gh pr diff:*)", "Bash(gh pr view:*)"],
+                "deny": []
+              }
+            }
           claude_args: --model claude-sonnet-4-6
           prompt: |
             A user commented "@claude" on PR #${{ github.event.issue.number }} in ${{ github.repository }}.
