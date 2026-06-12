@@ -7,7 +7,7 @@ on:
     types: [created]
 
 concurrency:
-  group: claude-review-pr-${{ github.event.pull_request.number || github.event.issue.number }}
+  group: claude-review-pr-${{ github.event.pull_request.number || github.event.issue.number }}-${{ github.event_name }}
   cancel-in-progress: true
 
 jobs:
@@ -39,11 +39,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -eo pipefail
-          PREV_ID=$(gh api repos/${{ github.repository }}/issues/${{ env.PR_NUMBER }}/comments \
-            --paginate | jq -s 'add | map(select(.body | contains("<!-- claude-review-"))) | last | .id')
-          if [ -n "$PREV_ID" ] && [ "$PREV_ID" != "null" ]; then
-            gh api repos/${{ github.repository }}/issues/comments/$PREV_ID -X DELETE
-          fi
+          PREV_IDS=$(gh api repos/${{ github.repository }}/issues/${{ env.PR_NUMBER }}/comments \
+            --paginate | jq -s '[add[] | select(.body | contains("<!-- claude-review-")) | .id]')
+          for ID in $(echo "$PREV_IDS" | jq -r '.[]'); do
+            gh api repos/${{ github.repository }}/issues/comments/$ID -X DELETE
+          done
 
       - uses: anthropics/claude-code-action@2c39411c224657eb2c2b9a146083fd021d72e970 # v1
         if: github.event_name == 'pull_request'
@@ -132,6 +132,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -eo pipefail
           MARKER="claude-review-${{ github.run_id }}"
           COMMENT_ID=$(gh api repos/${{ github.repository }}/issues/${{ env.PR_NUMBER }}/comments \
             --paginate | jq -s --arg marker "$MARKER" 'add | map(select(.body | contains($marker))) | last | .id')
