@@ -42,7 +42,7 @@ jobs:
           settings: |
             {
               "permissions": {
-                "allow": ["Bash(gh pr comment:*)", "Bash(gh pr diff:*)", "Bash(gh pr view:*)", "Bash(echo *)", "Bash(printf *)", "Bash(sha256sum*)"],
+                "allow": ["Bash(gh pr comment:*)", "Bash(gh pr diff:*)", "Bash(gh pr view:*)", "Bash(echo *)", "Bash(printf *)", "Bash(sha256sum)"],
                 "deny": []
               }
             }
@@ -122,7 +122,7 @@ jobs:
         run: |
           MARKER="claude-review-${{ github.run_id }}"
           COMMENT_ID=$(gh api repos/${{ github.repository }}/issues/${{ env.PR_NUMBER }}/comments \
-            --paginate | jq -s --arg marker "$MARKER" '[.[].[] | select(.body | contains($marker))] | last | .id')
+            --paginate | jq -s --arg marker "$MARKER" 'add | map(select(.body | contains($marker))) | last | .id')
 
           if [ -z "$COMMENT_ID" ] || [ "$COMMENT_ID" = "null" ]; then
             gh pr comment ${{ env.PR_NUMBER }} \
@@ -150,6 +150,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
         run: |
+          set -eo pipefail
           SAFE_URL=$(printf '%s' "$ARTIFACT_URL" | sed 's/[&|]/\\&/g')
           gh api repos/${{ github.repository }}/issues/comments/${{ env.COMMENT_ID }} \
             --jq '.body' \
@@ -196,9 +197,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -eo pipefail
           MARKER="claude-review-${{ github.run_id }}"
           COMMENT_ID=$(gh api repos/${{ github.repository }}/issues/${{ env.PR_NUMBER }}/comments \
-            --paginate | jq -s --arg marker "$MARKER" '[.[].[] | select(.body | contains($marker))] | last | .id')
+            --paginate | jq -s --arg marker "$MARKER" 'add | map(select(.body | contains($marker))) | last | .id')
 
           if [ -n "$COMMENT_ID" ] && [ "$COMMENT_ID" != "null" ]; then
             gh api repos/${{ github.repository }}/issues/comments/$COMMENT_ID --jq '.body' \
