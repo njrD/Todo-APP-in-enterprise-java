@@ -34,9 +34,7 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          claude_args: >-
-            --model claude-sonnet-4-6
-            --allowedTools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
+          claude_args: --model claude-sonnet-4-6
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
@@ -129,9 +127,7 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          claude_args: >-
-            --model claude-sonnet-4-6
-            --allowedTools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh issue comment:*)"
+          claude_args: --model claude-sonnet-4-6
           prompt: |
             A user commented "@claude" on PR #${{ github.event.issue.number }} in ${{ github.repository }}.
 
