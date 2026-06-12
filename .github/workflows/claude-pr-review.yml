@@ -123,7 +123,7 @@ jobs:
         run: |
           MARKER="claude-review-${{ github.run_id }}"
           COMMENT_ID=$(gh api repos/${{ github.repository }}/issues/${{ env.PR_NUMBER }}/comments \
-            | jq --arg marker "$MARKER" '[.[] | select(.body | contains($marker))] | last | .id')
+            --paginate | jq --arg marker "$MARKER" '[.[] | select(.body | contains($marker))] | last | .id')
 
           if [ -z "$COMMENT_ID" ] || [ "$COMMENT_ID" = "null" ]; then
             gh pr comment ${{ env.PR_NUMBER }} \
@@ -151,9 +151,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
         run: |
+          SAFE_URL=$(printf '%s' "$ARTIFACT_URL" | sed 's/[&\\/]/\\&/g')
           gh api repos/${{ github.repository }}/issues/comments/${{ env.COMMENT_ID }} \
             --jq '.body' \
-            | sed "s|ARTIFACT_URL_PLACEHOLDER|${ARTIFACT_URL}|g" > updated_body.md
+            | sed "s|ARTIFACT_URL_PLACEHOLDER|${SAFE_URL}|g" > updated_body.md
 
           gh api repos/${{ github.repository }}/issues/comments/${{ env.COMMENT_ID }} \
             -X PATCH --input - < <(jq -Rs '{"body":.}' updated_body.md)
@@ -162,7 +163,8 @@ jobs:
         if: >
           github.event_name == 'issue_comment' &&
           github.event.issue.pull_request != null &&
-          contains(github.event.comment.body, '@claude')
+          contains(github.event.comment.body, '@claude') &&
+          contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
         env:
           USER_COMMENT: ${{ github.event.comment.body }}
         with:
@@ -193,7 +195,7 @@ jobs:
         run: |
           MARKER="claude-review-${{ github.run_id }}"
           COMMENT_ID=$(gh api repos/${{ github.repository }}/issues/${{ env.PR_NUMBER }}/comments \
-            | jq --arg marker "$MARKER" '[.[] | select(.body | contains($marker))] | last | .id')
+            --paginate | jq --arg marker "$MARKER" '[.[] | select(.body | contains($marker))] | last | .id')
 
           if [ -n "$COMMENT_ID" ] && [ "$COMMENT_ID" != "null" ]; then
             gh api repos/${{ github.repository }}/issues/comments/$COMMENT_ID --jq '.body' \
