@@ -84,7 +84,7 @@ jobs:
             Only post via gh — do not output the review as a message.
 
       - name: Save review as artifact
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && !cancelled()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
