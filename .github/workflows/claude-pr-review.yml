@@ -40,7 +40,7 @@ jobs:
         run: |
           set -eo pipefail
           PREV_IDS=$(gh api repos/$GITHUB_REPOSITORY/issues/${{ env.PR_NUMBER }}/comments \
-            --paginate | jq -s '[add[] | select(.body | contains("<!-- claude-review-")) | .id]')
+            --paginate | jq -s '[(add // [])[] | select(.body | test("<!-- claude-review-[0-9]+ -->")) | .id]')
           while IFS= read -r ID; do
             gh api repos/$GITHUB_REPOSITORY/issues/comments/$ID -X DELETE
           done < <(echo "$PREV_IDS" | jq -r '.[]')
@@ -135,7 +135,7 @@ jobs:
           set -eo pipefail
           MARKER="claude-review-${{ github.run_id }}"
           COMMENT_ID=$(gh api repos/$GITHUB_REPOSITORY/issues/${{ env.PR_NUMBER }}/comments \
-            --paginate | jq -s --arg marker "$MARKER" 'add | map(select(.body | contains($marker))) | last | .id')
+            --paginate | jq -s --arg marker "$MARKER" '(add // []) | map(select(.body | contains($marker))) | last | .id')
 
           if [ -z "$COMMENT_ID" ] || [ "$COMMENT_ID" = "null" ]; then
             gh pr comment ${{ env.PR_NUMBER }} \
@@ -182,10 +182,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -eo pipefail
-          ACK_ID=$(gh pr comment ${{ env.PR_NUMBER }} \
-            --body "<!-- claude-review-${{ github.run_id }} -->⏳ Claude is thinking..." \
-            --json id --jq '.id')
-          echo "ACK_COMMENT_ID=$ACK_ID" >> $GITHUB_ENV
+          gh pr comment ${{ env.PR_NUMBER }} \
+            --body "<!-- claude-review-${{ github.run_id }} -->⏳ Claude is thinking..." || true
+          ACK_ID=$(gh api repos/$GITHUB_REPOSITORY/issues/${{ env.PR_NUMBER }}/comments \
+            --paginate | jq -s --arg m "claude-review-${{ github.run_id }}" \
+            '(add // []) | map(select(.body | contains($m))) | last | .id' 2>/dev/null || true)
+          echo "ACK_COMMENT_ID=${ACK_ID:-}" >> $GITHUB_ENV
 
       - uses: anthropics/claude-code-action@2c39411c224657eb2c2b9a146083fd021d72e970 # v1
         if: >
@@ -241,7 +243,7 @@ jobs:
           set -eo pipefail
           MARKER="claude-review-${{ github.run_id }}"
           COMMENT_ID=$(gh api repos/$GITHUB_REPOSITORY/issues/${{ env.PR_NUMBER }}/comments \
-            --paginate | jq -s --arg marker "$MARKER" 'add | map(select(.body | contains($marker))) | last | .id')
+            --paginate | jq -s --arg marker "$MARKER" '(add // []) | map(select(.body | contains($marker))) | last | .id')
 
           if [ -n "$COMMENT_ID" ] && [ "$COMMENT_ID" != "null" ]; then
             gh api repos/$GITHUB_REPOSITORY/issues/comments/$COMMENT_ID --jq '.body' \
