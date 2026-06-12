@@ -6,9 +6,18 @@ on:
   issue_comment:
     types: [created]
 
+concurrency:
+  group: claude-review-pr-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: true
+
 jobs:
   claude-review:
+    # Only runs on same-repo PRs; fork PRs lack secrets and write access
+    if: >
+      github.event_name == 'issue_comment' ||
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: read
       pull-requests: write
@@ -21,6 +30,7 @@ jobs:
 
       - uses: anthropics/claude-code-action@v1
         if: github.event_name == 'pull_request'
+        id: claude
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -36,6 +46,7 @@ jobs:
 
             The comment must follow this exact structure:
 
+            <!-- claude-review-${{ github.run_id }} -->
             <short summary of 3-5 bullet points covering the most important findings>
 
             📄 [Download full review](ARTIFACT_URL_PLACEHOLDER)
@@ -70,8 +81,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          MARKER="claude-review-${{ github.run_id }}"
           COMMENT_ID=$(gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
-            --jq '[.[] | select(.user.login == "github-actions[bot]")] | last | .id')
+            --jq --arg marker "$MARKER" '[.[] | select(.body | contains($marker))] | last | .id')
           echo "COMMENT_ID=$COMMENT_ID" >> $GITHUB_ENV
 
           gh api repos/${{ github.repository }}/issues/comments/$COMMENT_ID \
@@ -94,8 +106,12 @@ jobs:
         run: |
           gh api repos/${{ github.repository }}/issues/comments/${{ env.COMMENT_ID }} \
             --jq '.body' \
-            | python3 -c "import sys; body=sys.stdin.read(); print(body.replace('ARTIFACT_URL_PLACEHOLDER', '$ARTIFACT_URL'))" \
-            > updated_body.md
+            | python3 -c "
+          import sys, os
+          body = sys.stdin.read()
+          url = os.environ['ARTIFACT_URL']
+          print(body.replace('ARTIFACT_URL_PLACEHOLDER', url))
+          " > updated_body.md
 
           gh api repos/${{ github.repository }}/issues/comments/${{ env.COMMENT_ID }} \
             -X PATCH --field body=@updated_body.md
