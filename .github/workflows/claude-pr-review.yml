@@ -20,7 +20,7 @@ jobs:
     timeout-minutes: 10
     env:
       CLAUDE_MODEL: ${{ vars.CLAUDE_REVIEW_MODEL || 'claude-sonnet-4-6' }}
-      CLAUDE_MAX_TURNS: ${{ vars.CLAUDE_REVIEW_MAX_TURNS || 10 }}
+      CLAUDE_MAX_TURNS: ${{ vars.CLAUDE_REVIEW_MAX_TURNS || 5 }}
       PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
       ARTIFACT_NAME: claude-review-summary
     permissions:
@@ -32,6 +32,18 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 1
+
+      - name: Delete previous review comment
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eo pipefail
+          PREV_ID=$(gh api repos/${{ github.repository }}/issues/${{ env.PR_NUMBER }}/comments \
+            --paginate | jq -s 'add | map(select(.body | contains("<!-- claude-review-"))) | last | .id')
+          if [ -n "$PREV_ID" ] && [ "$PREV_ID" != "null" ]; then
+            gh api repos/${{ github.repository }}/issues/comments/$PREV_ID -X DELETE
+          fi
 
       - uses: anthropics/claude-code-action@2c39411c224657eb2c2b9a146083fd021d72e970 # v1
         if: github.event_name == 'pull_request'
@@ -126,7 +138,7 @@ jobs:
 
           if [ -z "$COMMENT_ID" ] || [ "$COMMENT_ID" = "null" ]; then
             gh pr comment ${{ env.PR_NUMBER }} \
-              --body "❌ **Claude review failed** — no comment was posted. Check your Anthropic API credits or [view the action logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})."
+              --body "❌ **Claude review failed** — no comment was posted. [View the action logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details."
             echo "::error::Claude did not post a review comment. Check API credits or action logs."
             exit 1
           fi
@@ -151,10 +163,10 @@ jobs:
           ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
         run: |
           set -eo pipefail
-          SAFE_URL=$(printf '%s' "$ARTIFACT_URL" | sed 's/[&|]/\\&/g')
           gh api repos/${{ github.repository }}/issues/comments/${{ env.COMMENT_ID }} \
             --jq '.body' \
-            | sed "s|ARTIFACT_URL_PLACEHOLDER|${SAFE_URL}|g" > updated_body.md
+            | jq -Rs --arg url "$ARTIFACT_URL" 'gsub("ARTIFACT_URL_PLACEHOLDER"; $url)' \
+            | jq -r '.' > updated_body.md
 
           gh api repos/${{ github.repository }}/issues/comments/${{ env.COMMENT_ID }} \
             -X PATCH --input - < <(jq -Rs '{"body":.}' updated_body.md)
