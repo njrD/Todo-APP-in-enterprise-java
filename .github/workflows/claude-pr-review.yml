@@ -32,7 +32,7 @@ jobs:
             - Security concerns
             - Suggestions for improvement
 
-            After writing the PR comment, also write a file called `review-summary.md` in the current directory with an LLM-friendly version of the review. Structure it as:
+            After writing the PR comment, also write a file called `review-summary.md` using the Bash tool with a command like: `cat > $GITHUB_WORKSPACE/review-summary.md << 'EOF' ... EOF`. The file must be written to $GITHUB_WORKSPACE. Structure it as:
 
             ```
             # PR Review Summary
@@ -65,7 +65,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: claude-review-summary
-          path: review-summary.md
+          path: ${{ github.workspace }}/review-summary.md
           if-no-files-found: ignore
 
       - uses: anthropics/claude-code-action@v1
