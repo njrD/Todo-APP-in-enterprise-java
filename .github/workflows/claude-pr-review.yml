@@ -41,9 +41,9 @@ jobs:
           set -eo pipefail
           PREV_IDS=$(gh api repos/${{ github.repository }}/issues/${{ env.PR_NUMBER }}/comments \
             --paginate | jq -s '[add[] | select(.body | contains("<!-- claude-review-")) | .id]')
-          for ID in $(echo "$PREV_IDS" | jq -r '.[]'); do
+          while IFS= read -r ID; do
             gh api repos/${{ github.repository }}/issues/comments/$ID -X DELETE
-          done
+          done < <(echo "$PREV_IDS" | jq -r '.[]')
 
       - uses: anthropics/claude-code-action@2c39411c224657eb2c2b9a146083fd021d72e970 # v1
         if: github.event_name == 'pull_request'
@@ -172,6 +172,21 @@ jobs:
           gh api repos/${{ github.repository }}/issues/comments/${{ env.COMMENT_ID }} \
             -X PATCH --input - < <(jq -Rs '{"body":.}' updated_body.md)
 
+      - name: Acknowledge @claude comment
+        if: >
+          github.event_name == 'issue_comment' &&
+          github.event.issue.pull_request != null &&
+          contains(github.event.comment.body, '@claude') &&
+          contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eo pipefail
+          COMMENT_URL=$(gh pr comment ${{ env.PR_NUMBER }} \
+            --body "<!-- claude-review-${{ github.run_id }} -->⏳ Claude is thinking..." \
+            --json url --jq '.url')
+          echo "CLAUDE_REPLY_URL=$COMMENT_URL" >> $GITHUB_ENV
+
       - uses: anthropics/claude-code-action@2c39411c224657eb2c2b9a146083fd021d72e970 # v1
         if: >
           github.event_name == 'issue_comment' &&
@@ -179,7 +194,8 @@ jobs:
           contains(github.event.comment.body, '@claude') &&
           contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
         # Accepted risk: trusted collaborators (OWNER/MEMBER/COLLABORATOR) could craft
-        # adversarial comment bodies. Blast radius is bounded by the narrow allow-list below.
+        # adversarial comment bodies that instruct Claude to post misleading content via
+        # gh pr comment — the only tool with write access in the allow-list below.
         env:
           USER_COMMENT: ${{ github.event.comment.body }}
         with:
@@ -188,7 +204,7 @@ jobs:
           settings: |
             {
               "permissions": {
-                "allow": ["Bash(gh pr comment:*)", "Bash(gh pr diff:*)", "Bash(gh pr view:*)"],
+                "allow": ["Bash(gh pr comment:*)", "Bash(gh pr diff:*)", "Bash(gh pr view:*)", "Bash(echo *)", "Bash(printf *)", "Bash(sha256sum)"],
                 "deny": []
               }
             }
