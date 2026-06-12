@@ -25,21 +25,45 @@ jobs:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           claude_args: >-
-            --model claude-sonnet-4-5
+            --model claude-sonnet-4-6
             --dangerously-skip-permissions
             --allowedTools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
-            RUN URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-            Review this pull request and post a short summary comment using:
+            Review this pull request and post a single comment using:
             gh pr comment ${{ github.event.pull_request.number }} --body "..."
 
-            The comment must be brief — 3 to 5 bullet points max — covering only the most important findings.
-            End the comment with this line exactly:
-            📄 [Full review artifact](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            The comment must follow this exact structure:
 
+            <short summary of 3-5 bullet points covering the most important findings>
+
+            📄 [Download full review](ARTIFACT_URL_PLACEHOLDER)
+
+            <details>
+            <summary>Full review</summary>
+
+            ## What Changed
+            <concise description of the diff>
+
+            ## Findings
+            ### Critical
+            <list or "None">
+            ### Warnings
+            <list or "None">
+            ### Suggestions
+            <list or "None">
+
+            ## Verdict
+            <one line: Approve / Request Changes / Needs Discussion>
+
+            ## Full Review
+            <complete narrative review>
+
+            </details>
+
+            Use the literal text ARTIFACT_URL_PLACEHOLDER for the link — it will be replaced with the real download URL after upload.
             Only post the comment via gh — do not output the review as a message.
 
       - name: Save review as artifact
@@ -47,21 +71,40 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
-            --jq '[.[] | select(.user.login == "github-actions[bot]")] | last | .body' \
-            > review-summary.md
+          COMMENT_ID=$(gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
+            --jq '[.[] | select(.user.login == "github-actions[bot]")] | last | .id')
+          echo "COMMENT_ID=$COMMENT_ID" >> $GITHUB_ENV
+
+          gh api repos/${{ github.repository }}/issues/comments/$COMMENT_ID \
+            --jq '.body' > review-summary.md
 
       - name: Upload review summary
         if: github.event_name == 'pull_request'
+        id: upload
         uses: actions/upload-artifact@v4
         with:
           name: claude-review-summary
           path: review-summary.md
           if-no-files-found: warn
 
+      - name: Update comment with artifact link
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ARTIFACT_ID=$(gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts \
+            --jq '.artifacts[] | select(.name == "claude-review-summary") | .id')
+          ARTIFACT_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts/$ARTIFACT_ID"
+
+          gh api repos/${{ github.repository }}/issues/comments/${{ env.COMMENT_ID }} \
+            --jq '.body' | sed "s|ARTIFACT_URL_PLACEHOLDER|$ARTIFACT_URL|g" > updated_body.md
+
+          gh api repos/${{ github.repository }}/issues/comments/${{ env.COMMENT_ID }} \
+            -X PATCH --field body=@updated_body.md
+
       - uses: anthropics/claude-code-action@v1
         if: github.event_name == 'issue_comment'
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          claude_args: --model claude-sonnet-4-5 --dangerously-skip-permissions
+          claude_args: --model claude-sonnet-4-6 --dangerously-skip-permissions
