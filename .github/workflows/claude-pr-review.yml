@@ -85,6 +85,8 @@ jobs:
             | jq --arg marker "$MARKER" '[.[] | select(.body | contains($marker))] | last | .id')
 
           if [ -z "$COMMENT_ID" ] || [ "$COMMENT_ID" = "null" ]; then
+            gh pr comment ${{ github.event.pull_request.number }} \
+              --body "❌ **Claude review failed** — no comment was posted. Check your Anthropic API credits or [view the action logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})."
             echo "::error::Claude did not post a review comment. Check API credits or action logs."
             exit 1
           fi
