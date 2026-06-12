@@ -31,34 +31,14 @@ jobs:
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
+            RUN URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-            Review this pull request and post a single top-level comment using:
+            Review this pull request and post a short summary comment using:
             gh pr comment ${{ github.event.pull_request.number }} --body "..."
 
-            Structure the comment exactly like this:
-
-            ## Context
-            <repo, PR number, title, author, date>
-
-            ## What Changed
-            <concise description of the diff>
-
-            ## Findings
-            ### Critical
-            <list or "None">
-            ### Warnings
-            <list or "None">
-            ### Suggestions
-            <list or "None">
-
-            ## Verdict
-            <one line: Approve / Request Changes / Needs Discussion>
-
-            ## Full Review
-            <complete narrative review>
-
-            ---
-            *A downloadable copy of this review is attached as a workflow artifact named `claude-review-summary`.*
+            The comment must be brief — 3 to 5 bullet points max — covering only the most important findings.
+            End the comment with this line exactly:
+            📄 [Full review artifact](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
 
             Only post the comment via gh — do not output the review as a message.
 
