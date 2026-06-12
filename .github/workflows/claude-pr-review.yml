@@ -57,39 +57,63 @@ jobs:
             Post a single comment using:
             gh pr comment ${{ env.PR_NUMBER }} --body "..."
 
+            The HEAD SHA of this PR is: ${{ github.event.pull_request.head.sha }}
+            The base repo is: ${{ github.repository }}
+
+            For every file/line reference, link to the exact line on GitHub using this format:
+            https://github.com/${{ github.repository }}/blob/${{ github.event.pull_request.head.sha }}/path/to/File.java#L42
+
             The comment must follow this exact structure:
 
             <!-- claude-review-${{ github.run_id }} -->
-            <short summary of 3-5 bullet points, each prefixed with the appropriate severity emoji>
+            ### PR Review Summary
+
+            Group the top 3-5 findings by severity, same format as the full review:
+
+            **🔴 Important**
+            1. **Issue title** ([`File.java:42`](https://github.com/${{ github.repository }}/blob/${{ github.event.pull_request.head.sha }}/path/File.java#L42))
+               - One-line explanation.
+
+            **🟡 Nit**
+            1. **Issue title** ([`File.java:10`](https://github.com/${{ github.repository }}/blob/${{ github.event.pull_request.head.sha }}/path/File.java#L10))
+               - One-line explanation.
+
+            Omit severity sections with no findings.
 
             📄 [Download full review](ARTIFACT_URL_PLACEHOLDER)
 
             <details>
             <summary>Full review</summary>
 
-            ## What Changed
+            ### What Changed
             <concise description of what the diff introduces>
 
-            ## Findings
+            ### Findings
 
-            Use these severity levels, matching the Claude Code Review format:
+            Use these severity levels:
             - 🔴 **Important** — a bug that should be fixed before merging
             - 🟡 **Nit** — a minor issue, worth fixing but not blocking
-            - 🟣 **Pre-existing** — a bug that exists but was not introduced by this PR
+            - 🟣 **Pre-existing** — a bug present in the codebase but not introduced by this PR
 
-            For each finding include a file and line reference in this format: `file.java:42`
+            Group findings by severity. For each finding:
+            - Bold the issue title, followed by the linked file:line in parentheses
+            - Sub-bullet with a concise explanation
 
-            | Severity | Location | Issue |
-            |----------|----------|-------|
-            | 🔴 Important | `path/to/File.java:12` | Description |
-            | 🟡 Nit | `path/to/File.java:34` | Description |
+            Example format:
+            **🔴 Important**
+            1. **Null pointer on login failure** ([`LoginServlet.java:84`](https://github.com/${{ github.repository }}/blob/${{ github.event.pull_request.head.sha }}/src/LoginServlet.java#L84))
+               - `response.sendRedirect` is called after `getWriter()` has already been used, throwing IllegalStateException on every failed login.
 
-            If no findings, write "No issues found."
+            **🟡 Nit**
+            1. **Magic string for session key** ([`TodoServlet.java:31`](https://github.com/${{ github.repository }}/blob/${{ github.event.pull_request.head.sha }}/src/TodoServlet.java#L31))
+               - `"user"` is repeated in three places; extract to a constant.
 
-            ## Verdict
+            If no findings for a severity level, omit that section entirely.
+
+            ### Verdict
             <one line: Approve / Request Changes / Needs Discussion>
 
-            ## Full Review
+            ### Full Review
             <complete narrative review scoped to the diff>
 
             </details>
