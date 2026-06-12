@@ -24,17 +24,18 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          show_full_output: true
-          claude_args: --model claude-sonnet-4-5 --dangerously-skip-permissions
+          claude_args: >-
+            --model claude-sonnet-4-5
+            --dangerously-skip-permissions
+            --allowedTools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
           prompt: |
-            Please review this pull request. Cover:
-            - What the PR does (brief summary)
-            - Code quality and correctness
-            - Potential bugs or edge cases
-            - Security concerns
-            - Suggestions for improvement
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
 
-            Structure your PR comment in this exact LLM-friendly format:
+            Review this pull request and post a single top-level comment using:
+            gh pr comment ${{ github.event.pull_request.number }} --body "..."
+
+            Structure the comment exactly like this:
 
             ## Context
             <repo, PR number, title, author, date>
@@ -59,6 +60,8 @@ jobs:
             ---
             *A downloadable copy of this review is attached as a workflow artifact named `claude-review-summary`.*
 
+            Only post the comment via gh — do not output the review as a message.
+
       - name: Save review as artifact
         if: github.event_name == 'pull_request'
         env:
@@ -67,10 +70,6 @@ jobs:
           gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
             --jq '[.[] | select(.user.login == "github-actions[bot]")] | last | .body' \
             > review-summary.md
-          echo "" >> review-summary.md
-          echo "---" >> review-summary.md
-          echo "PR: ${{ github.event.pull_request.html_url }}" >> review-summary.md
-          echo "Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> review-summary.md
 
       - name: Upload review summary
         if: github.event_name == 'pull_request'
