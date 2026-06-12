@@ -17,6 +17,21 @@ jobs:
 
     steps:
       - uses: anthropics/claude-code-action@beta
+        if: github.event_name == 'pull_request'
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          direct_prompt: |
+            Please review this pull request. Cover:
+            - What the PR does (brief summary)
+            - Code quality and correctness
+            - Potential bugs or edge cases
+            - Security concerns
+            - Suggestions for improvement
+            Post your review as a PR comment.
+
+      - uses: anthropics/claude-code-action@beta
+        if: github.event_name == 'issue_comment'
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
